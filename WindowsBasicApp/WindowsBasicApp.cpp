@@ -1,4 +1,4 @@
-// WindowsBasicApp.cpp : Defines the entry point for the application.
+﻿// WindowsBasicApp.cpp : Defines the entry point for the application.
 //
 
 #include "framework.h"
@@ -112,6 +112,192 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
    return TRUE;
 }
 
+// Subclass procedure for Edit control
+LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    switch (msg)
+    {
+    case WM_PAINT:
+    {
+        // Default paint first
+        LRESULT lr = CallWindowProc(WndProc, hwnd, msg, wParam, lParam);
+
+        // Now draw notebook lines
+        HDC hdc = GetDC(hwnd);
+
+        RECT rc;
+        GetClientRect(hwnd, &rc);
+
+        // Horizontal ruled lines
+       /* HPEN hBluePen = CreatePen(PS_SOLID, 1, RGB(200, 200, 255));
+        HGDIOBJ hOldPen = SelectObject(hdc, hBluePen);
+
+        int lineHeight = 20;
+        for (int y = lineHeight; y < rc.bottom; y += lineHeight)
+        {
+            MoveToEx(hdc, 0, y, NULL);
+            LineTo(hdc, rc.right, y);
+        }
+
+        SelectObject(hdc, hOldPen);
+        DeleteObject(hBluePen);
+        */
+
+        // Vertical red margin line
+        HPEN hRedPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
+        HGDIOBJ hOldPen = SelectObject(hdc, hRedPen);
+        MoveToEx(hdc, 50, 0, NULL);
+        LineTo(hdc, 50, rc.bottom);
+        SelectObject(hdc, hOldPen);
+        DeleteObject(hRedPen);
+
+        ReleaseDC(hwnd, hdc);
+        return lr;
+    }
+    }
+    return CallWindowProc(OldEditProc, hwnd, msg, wParam, lParam);
+}
+
+//Edit control area
+// HWND hwnd
+/////////
+
+
+// Subclass procedure for the Edit control to stop overrite
+LRESULT CALLBACK EditProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
+    UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
+{
+    switch (msg)
+    {
+    case WM_PAINT:
+    {
+        LRESULT lres = DefSubclassProc(hwnd, msg, wParam, lParam);
+
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+
+        RECT rc;
+        GetClientRect(hwnd, &rc);
+
+        // horizontal blue lines
+        HPEN hBluePen = CreatePen(PS_SOLID, 1, RGB(100, 149, 237));
+        HPEN hOld = (HPEN)SelectObject(hdc, hBluePen);
+
+        for (int y = 20; y < rc.bottom; y += 20)
+        {
+            MoveToEx(hdc, 0, y, NULL);
+            LineTo(hdc, rc.right, y);
+        }
+        SelectObject(hdc, hOld);
+        DeleteObject(hBluePen);
+
+        // vertical red margin line
+        HPEN hRedPen = CreatePen(PS_SOLID, 1, RGB(255, 0, 0));
+        hOld = (HPEN)SelectObject(hdc, hRedPen);
+
+        MoveToEx(hdc, REDLINE_X, 0, NULL);
+        LineTo(hdc, REDLINE_X, rc.bottom);
+
+        SelectObject(hdc, hOld);
+        DeleteObject(hRedPen);
+
+        EndPaint(hwnd, &ps);
+        return lres;
+    }
+    case WM_NCDESTROY:
+        RemoveWindowSubclass(hwnd, EditProc, uIdSubclass);
+        break;
+    }
+    return DefSubclassProc(hwnd, msg, wParam, lParam);
+}
+
+
+    const char g_szClassName[] = "Quick Note";
+
+// Function to create Edit control
+    void CreateEditControl(HWND hwnd)
+    {
+        int marginWidth = 40;
+        RECT rc;
+        GetClientRect(hwnd, &rc);
+
+        hEdit = CreateWindowEx(
+            WS_EX_CLIENTEDGE, L"EDIT", L"",
+            WS_CHILD | WS_VISIBLE | WS_HSCROLL | WS_VSCROLL |
+            ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
+            0, 0, 0, 0, hwnd, (HMENU)IDC_WINDOWSBASICAPP,
+            GetModuleHandle(NULL), NULL);
+
+        // Background color (light yellow)
+        hEditBg = CreateSolidBrush(RGB(255, 255, 200));
+
+        // Font
+        HFONT hFont = CreateFont(
+            18, 0, 0, 0, FW_NORMAL,
+            FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS,
+            CLIP_DEFAULT_PRECIS,
+            DEFAULT_QUALITY,
+            FIXED_PITCH | FF_MODERN,
+            L"Consolas"
+        );
+        SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+        // Ensure text starts AFTER red margin
+        SendMessage(hEdit, EM_SETMARGINS, EC_LEFTMARGIN, MAKELPARAM(LEFT_MARGIN+5, 0));
+
+
+        //OldEditProc = (WNDPROC)SetWindowLongPtr(hEdit, GWLP_WNDPROC, (LONG_PTR)EditSubclassProc); // set Red Margin and Blue color line on notepad
+
+        // Subclass the edit control (ONLY ONE METHOD)
+       // SetWindowSubclass(hEdit, EditProc, 0, 0);
+    }
+
+// Resize Edit control when window resizes
+void ResizeEdit(HWND hwnd) {
+    RECT rc;
+    GetClientRect(hwnd, &rc);
+    SetWindowPos(hEdit, NULL, 0, 0, rc.right, rc.bottom, SWP_NOZORDER);
+}
+
+
+
+
+void OpenFile(HWND hwnd)
+{
+    OPENFILENAME ofn;
+    wchar_t szFile[260] = { 0 };
+
+    ZeroMemory(&ofn, sizeof(ofn));
+
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd;
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile) / sizeof(szFile[0]);
+    ofn.lpstrFilter = L"Text Files\0*.TXT\0All Files\0*.*\0";
+    ofn.nFilterIndex = 1;
+    ofn.lpstrFileTitle = NULL;
+    ofn.nMaxFileTitle = 0;
+    ofn.lpstrInitialDir = NULL;
+    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+    if (GetSaveFileName(&ofn) == TRUE) {
+        int length = GetWindowTextLength(hEdit);
+        char* buffer = new char[length + 1];
+        GetWindowTextA(hEdit, buffer, length + 1);
+
+        std::ofstream file(ofn.lpstrFile);
+        if (file) {
+            file << buffer;
+        }
+        delete[] buffer;
+    }
+
+}
+
+
+
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
 //
@@ -126,6 +312,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
+    case WM_CREATE:
+        CreateEditControl(hWnd);
+        break;
+
+    case WM_SIZE:
+        ResizeEdit(hWnd);
+        break;
+
+    case WM_CTLCOLOREDIT:
+    {
+        HDC hdcEdit = (HDC)wParam;
+        SetBkColor(hdcEdit, RGB(255, 255, 200));  // yellow background
+        SetTextColor(hdcEdit, RGB(0, 0, 0));      // black text
+        return (LRESULT)hEditBg; // brush 
+        // return our brush
+    }
+    break;
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
@@ -162,18 +365,41 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_PAINT:
         {
              
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            // TODO: Add any drawing code that uses hdc here...
-            HBRUSH hBrush = CreateSolidBrush(RGB(0, 128, 128));
-            
-            FillRect(hdc, &ps.rcPaint, hBrush);
-            TextOutA(hdc, 50, 50, "Welcome to Win32 API Demo", strlen("Welcome to Win32 API Demo"));
-            OutputDebugStringA("Painting in Progress");
-            DeleteObject(hBrush);
-            EndPaint(hWnd, &ps);
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+
+        RECT rcClient;
+        GetClientRect(hWnd, &rcClient);
+
+        // Fill background yellow
+        FillRect(hdc, &rcClient, hEditBg);
+
+        // Horizontal ruled lines
+        HPEN hBluePen = CreatePen(PS_SOLID, 1, RGB(200, 200, 255)); // light blue lines
+        HGDIOBJ hOldPen = SelectObject(hdc, hBluePen);
+
+        int lineHeight = 20;
+        for (int y = lineHeight; y < rcClient.bottom; y += lineHeight)
+        {
+            MoveToEx(hdc, 0, y, NULL);
+            LineTo(hdc, rcClient.right, y);
         }
-        break;
+
+        // Restore pen
+        SelectObject(hdc, hOldPen);
+        DeleteObject(hBluePen);
+
+        // Vertical red margin line
+        HPEN hRedPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
+        hOldPen = SelectObject(hdc, hRedPen);
+        MoveToEx(hdc, 50, 0, NULL); // 50px margin
+        LineTo(hdc, 50, rcClient.bottom);
+        SelectObject(hdc, hOldPen);
+        DeleteObject(hRedPen);
+
+        EndPaint(hWnd, &ps);
+    }
+    break;
     case WM_DESTROY:
         OutputDebugStringA("Window Destroyed\n");
         PostQuitMessage(0);
@@ -239,88 +465,121 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     return (INT_PTR)FALSE;
 }
 
+
+
+//font enumartion 
+
+int CALLBACK EnumFontFamExProc(const LOGFONT* lpelfe, const TEXTMETRIC* lpntme,
+    DWORD FontType, LPARAM lParam) {
+    HWND hCombo = (HWND)lParam;
+    SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)lpelfe->lfFaceName);
+    return 1;
+}
+
+//Helper function to apply the show font:
+void UpdateFontPreview(HWND hDlg)
+{
+    TCHAR fontName[LF_FACESIZE], fontSizeStr[10], fontWeightStr[20];
+
+    GetDlgItemText(hDlg, IDC_FONT_FAMILY, fontName, LF_FACESIZE);
+    GetDlgItemText(hDlg, IDC_FONT_SIZE, fontSizeStr, 10);
+    GetDlgItemText(hDlg, IDC_FONT_WEIGHT, fontWeightStr, 20);
+
+    int size = _ttoi(fontSizeStr);
+    if (size <= 0) size = 12;
+
+    int weight = _tcscmp(fontWeightStr, TEXT("Bold")) == 0 ? FW_BOLD : FW_NORMAL;
+
+    HFONT hFont = CreateFont(size, 0, 0, 0, weight, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, VARIABLE_PITCH, fontName);
+
+    HWND hPreview = GetDlgItem(hDlg, IDC_PREVIEW_TEXT);
+    SendMessage(hPreview, WM_SETFONT, (WPARAM)hFont, TRUE);
+    InvalidateRect(hPreview, NULL, TRUE);
+}
+
+void ApplyFontToMainEdit(HWND hDlgModeless)
+{
+    TCHAR fontName[LF_FACESIZE], fontSizeStr[10], fontWeightStr[20];
+
+    GetDlgItemText(hDlgModeless, IDC_FONT_FAMILY, fontName, LF_FACESIZE);
+    GetDlgItemText(hDlgModeless, IDC_FONT_SIZE, fontSizeStr, 10);
+    GetDlgItemText(hDlgModeless, IDC_FONT_WEIGHT, fontWeightStr, 20);
+
+    int size = _ttoi(fontSizeStr);
+    if (size <= 0) size = 12;
+
+    int weight = _tcscmp(fontWeightStr, TEXT("Bold")) == 0 ? FW_BOLD : FW_NORMAL;
+
+    HWND hMainWnd = GetParent(hDlgModeless); // or store main hwnd some other way
+    HDC hdc = GetDC(hMainWnd);
+    int logPixelsY = GetDeviceCaps(hdc, LOGPIXELSY);
+    ReleaseDC(hMainWnd, hdc);
+
+    int height = -MulDiv(size, logPixelsY, 72);
+
+    HFONT hFont = CreateFont(height, 0, 0, 0, weight, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        CLEARTYPE_QUALITY, VARIABLE_PITCH, fontName);
+
+
+    SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
+    InvalidateRect(hDlgModeless, NULL, TRUE);
+}
+
+
+
 //MyModeless Window
 INT_PTR CALLBACK MyModeless(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
-      case WM_INITDIALOG:
+    case WM_INITDIALOG:
+    {
+        // 🧾 Fill font family combo
+        HWND hFontFamily = GetDlgItem(hDlg, IDC_FONT_FAMILY);
+        HDC hdc = GetDC(hDlg);
+        LOGFONT lf = { 0 };
+        lf.lfCharSet = DEFAULT_CHARSET;
+        EnumFontFamiliesEx(hdc, &lf, (FONTENUMPROC)EnumFontFamExProc, (LPARAM)hFontFamily, 0);
+        ReleaseDC(hDlg, hdc);
+        SendMessage(hFontFamily, CB_SETCURSEL, 0, 0);
+
+        // 🔢 Default font size
+        SetDlgItemText(hDlg, IDC_FONT_SIZE, TEXT("14"));
+
+        // 💪 Populate font weight combo
+        HWND hFontWeight = GetDlgItem(hDlg, IDC_FONT_WEIGHT);
+        SendMessage(hFontWeight, CB_ADDSTRING, 0, (LPARAM)TEXT("Normal"));
+        SendMessage(hFontWeight, CB_ADDSTRING, 0, (LPARAM)TEXT("Bold"));
+        SendMessage(hFontWeight, CB_SETCURSEL, 0, 0);
+
+        UpdateFontPreview(hDlg);  //To update the setting in Edit area
+        return TRUE;
+    }
+    break;
+    case WM_COMMAND:
+        if (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == EN_CHANGE)
         {
-            HWND hList = GetDlgItem(hDlg, IDC_LIST2);
-
-            // Add ages from 18 to 35 (inclusive) in steps of 5
-            for (int age = 18; age <= 35; age += 1) {
-                wchar_t buffer[10];
-                wsprintf(buffer, L"%d", age);  // Convert integer to string
-                SendMessage(hList, LB_ADDSTRING, 0, (LPARAM)buffer);
-            }
-
-            // Add Gender combo box
-            HWND hGenderList = GetDlgItem(hDlg, IDC_LIST1);
-           /* SendMessage(hGenderList, LB_ADDSTRING, 0, (LPARAM)L"Male");
-            SendMessage(hGenderList, LB_ADDSTRING, 0, (LPARAM)L"Female");
-            SendMessage(hGenderList, LB_ADDSTRING, 0, (LPARAM)L"Other");
-            */
-
-            
+            UpdateFontPreview(hDlg);
+        }
+        switch (LOWORD(wParam))
+        {
+        case IDCANCEL: 
+            EndDialog(hDlg, IDCANCEL);
             return TRUE;
-
-
+        case IDOK:
+            ApplyFontToMainEdit(hDlg);
+            EndDialog(hDlg, IDOK);
         }
         break;
-    case WM_COMMAND:
-        //if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-        if(LOWORD(wParam) == IDCANCEL)
-        {
-            ShowWindow(hDlg, SW_HIDE);  // just hide instead of destroy
-            return (INT_PTR)TRUE;
-        }
-        if (HIWORD(wParam) == BN_CLICKED && LOWORD(wParam) == IDOK)
-        {
-            wchar_t buffer[256];
-            GetDlgItemText(hModelessDlg, IDC_EDIT_NAME, buffer, 256);
-            
-            //Age
-            int selectAgeIndex = (int)SendDlgItemMessage(hModelessDlg, IDC_LIST2, LB_GETCURSEL, 0, 0);
-            wchar_t age[100];
-            SendDlgItemMessage(hModelessDlg, IDC_LIST2, LB_GETTEXT, selectAgeIndex, (LPARAM)age);
-
-            //Gender
-           // int selectGenderIndex = (int)SendDlgItemMessage(hModelessDlg, IDC_LIST1, LB_GETCURSEL, 0, 0);
-           // wchar_t gender[100];
-            //SendDlgItemMessage(hModelessDlg, IDC_LIST1, LB_GETTEXT, selectGenderIndex, (LPARAM)gender);
-
-
-
-            //radio button gender
-            int gender = -1;
-            if (IsDlgButtonChecked(hDlg, IDC_RADIO1) == BST_CHECKED)
-                gender = 0;
-            else if (IsDlgButtonChecked(hDlg, IDC_RADIO2) == BST_CHECKED)
-                gender = 1;
-            else if (IsDlgButtonChecked(hDlg, IDC_RADIO3) == BST_CHECKED)
-                gender = 2;
-
-            const wchar_t* genderStr = L"Unknown";
-            switch (gender) {
-            case 0:
-                genderStr = L"Male";
-                break;
-            case 1:
-                genderStr = L"Female";
-                break;
-            case 2:
-                genderStr = L"Other";
-                break;
-            }
-
-            //message
-            wchar_t msg[300];
-            wsprintf(msg, L"Hello, %s!\n Your age is %s \n Your gender is %s ", buffer,age, genderStr);
-
-            MessageBox(hDlg, msg, L"Greeting", MB_OK);
-        }
-    break;
+    case WM_CLOSE:
+        DestroyWindow(hDlg);
+        return TRUE;
+       
     }
+
     return (INT_PTR)FALSE;
 }
+
