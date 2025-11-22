@@ -15,3 +15,4 @@ WNDPROC OldEditProc;
 TCHAR fontName[LF_FACESIZE];
 TCHAR fontSizeStr[16];
 TCHAR fontWeightStr[20];
+const char g_szClassName[] = "Quick Note";

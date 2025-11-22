@@ -7,6 +7,7 @@
 
 #define MAX_LOADSTRING 100
 
+
 // Global Variables:
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
@@ -18,6 +19,8 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    MyModeless(HWND, UINT, WPARAM, LPARAM);
+
+//Window Entry Point
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
                      _In_ LPWSTR    lpCmdLine,
@@ -120,41 +123,45 @@ LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
     case WM_PAINT:
     {
         // Default paint first
-        LRESULT lr = CallWindowProc(WndProc, hwnd, msg, wParam, lParam);
+        LRESULT lr = CallWindowProc(OldEditProc, hwnd, msg, wParam, lParam);
 
         // Now draw notebook lines
         HDC hdc = GetDC(hwnd);
 
-        RECT rc;
-        GetClientRect(hwnd, &rc);
-
-        // Horizontal ruled lines
-       /* HPEN hBluePen = CreatePen(PS_SOLID, 1, RGB(200, 200, 255));
-        HGDIOBJ hOldPen = SelectObject(hdc, hBluePen);
-
-        int lineHeight = 20;
-        for (int y = lineHeight; y < rc.bottom; y += lineHeight)
+        if (hdc)
         {
-            MoveToEx(hdc, 0, y, NULL);
-            LineTo(hdc, rc.right, y);
+            RECT rc;
+            GetClientRect(hwnd, &rc);
+
+            // Horizontal ruled lines
+            /*HPEN hBluePen = CreatePen(PS_SOLID, 1, RGB(200, 200, 255));
+            HGDIOBJ hOldPen = SelectObject(hdc, hBluePen);
+
+            int lineHeight = 20;
+            for (int y = lineHeight; y < rc.bottom; y += lineHeight)
+            {
+                MoveToEx(hdc, 0, y, NULL);
+                LineTo(hdc, rc.right, y);
+            }
+
+            SelectObject(hdc, hOldPen);
+            DeleteObject(hBluePen);
+           */
+
+           // Vertical red margin line
+            HPEN hRedPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
+            HGDIOBJ hOldPen = SelectObject(hdc, hRedPen);
+            MoveToEx(hdc, 50, 0, NULL);
+            LineTo(hdc, 50, rc.bottom);
+            SelectObject(hdc, hOldPen);
+            DeleteObject(hRedPen);
+
+            ReleaseDC(hwnd, hdc);
         }
-
-        SelectObject(hdc, hOldPen);
-        DeleteObject(hBluePen);
-        */
-
-        // Vertical red margin line
-        HPEN hRedPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
-        HGDIOBJ hOldPen = SelectObject(hdc, hRedPen);
-        MoveToEx(hdc, 50, 0, NULL);
-        LineTo(hdc, 50, rc.bottom);
-        SelectObject(hdc, hOldPen);
-        DeleteObject(hRedPen);
-
-        ReleaseDC(hwnd, hdc);
         return lr;
     }
     }
+    // Default handling for everything else
     return CallWindowProc(OldEditProc, hwnd, msg, wParam, lParam);
 }
 
@@ -163,64 +170,11 @@ LRESULT CALLBACK EditSubclassProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
 /////////
 
 
-// Subclass procedure for the Edit control to stop overrite
-LRESULT CALLBACK EditProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
-    UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
-{
-    switch (msg)
-    {
-    case WM_PAINT:
-    {
-        LRESULT lres = DefSubclassProc(hwnd, msg, wParam, lParam);
-
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-
-        RECT rc;
-        GetClientRect(hwnd, &rc);
-
-        // horizontal blue lines
-        HPEN hBluePen = CreatePen(PS_SOLID, 1, RGB(100, 149, 237));
-        HPEN hOld = (HPEN)SelectObject(hdc, hBluePen);
-
-        for (int y = 20; y < rc.bottom; y += 20)
-        {
-            MoveToEx(hdc, 0, y, NULL);
-            LineTo(hdc, rc.right, y);
-        }
-        SelectObject(hdc, hOld);
-        DeleteObject(hBluePen);
-
-        // vertical red margin line
-        HPEN hRedPen = CreatePen(PS_SOLID, 1, RGB(255, 0, 0));
-        hOld = (HPEN)SelectObject(hdc, hRedPen);
-
-        MoveToEx(hdc, REDLINE_X, 0, NULL);
-        LineTo(hdc, REDLINE_X, rc.bottom);
-
-        SelectObject(hdc, hOld);
-        DeleteObject(hRedPen);
-
-        EndPaint(hwnd, &ps);
-        return lres;
-    }
-    case WM_NCDESTROY:
-        RemoveWindowSubclass(hwnd, EditProc, uIdSubclass);
-        break;
-    }
-    return DefSubclassProc(hwnd, msg, wParam, lParam);
-}
-
-
-    const char g_szClassName[] = "Quick Note";
 
 // Function to create Edit control
     void CreateEditControl(HWND hwnd)
     {
-        int marginWidth = 40;
-        RECT rc;
-        GetClientRect(hwnd, &rc);
-
+        
         hEdit = CreateWindowEx(
             WS_EX_CLIENTEDGE, L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | WS_HSCROLL | WS_VSCROLL |
@@ -229,7 +183,7 @@ LRESULT CALLBACK EditProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
             GetModuleHandle(NULL), NULL);
 
         // Background color (light yellow)
-        hEditBg = CreateSolidBrush(RGB(255, 255, 200));
+        //hEditBg = CreateSolidBrush(RGB(255, 255, 200));
 
         // Font
         HFONT hFont = CreateFont(
@@ -245,9 +199,7 @@ LRESULT CALLBACK EditProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam,
         SendMessage(hEdit, WM_SETFONT, (WPARAM)hFont, TRUE);
 
         // Ensure text starts AFTER red margin
-        SendMessage(hEdit, EM_SETMARGINS, EC_LEFTMARGIN, MAKELPARAM(LEFT_MARGIN+5, 0));
-
-
+        //SendMessage(hEdit, EM_SETMARGINS, EC_LEFTMARGIN, MAKELPARAM(LEFT_MARGIN, 0));
         //OldEditProc = (WNDPROC)SetWindowLongPtr(hEdit, GWLP_WNDPROC, (LONG_PTR)EditSubclassProc); // set Red Margin and Blue color line on notepad
 
         // Subclass the edit control (ONLY ONE METHOD)
@@ -264,7 +216,7 @@ void ResizeEdit(HWND hwnd) {
 
 
 
-void OpenFile(HWND hwnd)
+void DoFileSave(HWND hwnd)
 {
     OPENFILENAME ofn;
     wchar_t szFile[260] = { 0 };
@@ -296,6 +248,36 @@ void OpenFile(HWND hwnd)
 
 }
 
+void DoFileOpen(HWND hwnd)
+{
+    OPENFILENAME ofn = { 0 };
+    wchar_t szFile[260] = { 0 };
+
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = hwnd;
+    ofn.lpstrFilter = L"Text Files\0*.txt\0All Files\0*.*\0";
+    ofn.lpstrFile = szFile;
+    ofn.nMaxFile = sizeof(szFile) / sizeof(szFile[0]);
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+
+    HWND hEdit = GetDlgItem(hwnd, IDC_WINDOWSBASICAPP); // Edit control handle
+
+    if (GetOpenFileNameW(&ofn) == TRUE) {
+        std::wifstream file(ofn.lpstrFile);
+        if (file) {
+            std::wstring content((std::istreambuf_iterator<wchar_t>(file)),
+                std::istreambuf_iterator<wchar_t>());
+            SetWindowTextW(hEdit, content.c_str());
+        }
+    }
+}
+
+void DoFileNew(HWND hWnd)
+{
+    HWND hEdit = GetDlgItem(hWnd, IDC_WINDOWSBASICAPP); // Edit control handle
+    SetWindowText(hEdit, TEXT("")); //clear the text nox;
+}
+
 
 
 //
@@ -323,10 +305,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     case WM_CTLCOLOREDIT:
     {
         HDC hdcEdit = (HDC)wParam;
-        SetBkColor(hdcEdit, RGB(255, 255, 200));  // yellow background
+        //SetBkColor(hdcEdit, RGB(255, 255, 200));  // yellow background
         SetTextColor(hdcEdit, RGB(0, 0, 0));      // black text
-        return (LRESULT)hEditBg; // brush 
-        // return our brush
+        return (LRESULT)hEditBg;// return our brush
     }
     break;
     case WM_COMMAND:
@@ -342,7 +323,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 DestroyWindow(hWnd);
                 break;
             case IDM_FILE_OPEN:
-                MessageBoxA(hWnd, "This is my first dialog!", "Menu", MB_OK);
+                DoFileOpen(hWnd);
+                break;
+                //MessageBoxA(hWnd, "This is my first dialog!", "Menu", MB_OK);
+                break;
+            case IDM_FILE_SAVE:
+                DoFileSave(hWnd);
+                break;
+            case IDM_FILE_NEW:
+                DoFileNew(hWnd);
                 break;
             case IDM_EDIT_MODELESS:
                 if (hModelessDlg == NULL) // create only once
@@ -363,42 +352,41 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         break;
     case WM_PAINT:
+        // Now draw notebook lines
+    /* {
+        HDC hdc = GetDC(hWnd);
+
+        if (hdc)
         {
-             
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hWnd, &ps);
+            RECT rc;
+            GetClientRect(hWnd, &rc);
 
-        RECT rcClient;
-        GetClientRect(hWnd, &rcClient);
+            // Horizontal ruled lines
+            HPEN hBluePen = CreatePen(PS_SOLID, 1, RGB(200, 200, 255));
+            HGDIOBJ hOldPen = SelectObject(hdc, hBluePen);
 
-        // Fill background yellow
-        FillRect(hdc, &rcClient, hEditBg);
+            int lineHeight = 20;
+            for (int y = lineHeight; y < rc.bottom; y += lineHeight)
+            {
+                MoveToEx(hdc, 0, y, NULL);
+                LineTo(hdc, rc.right, y);
+            }
 
-        // Horizontal ruled lines
-        HPEN hBluePen = CreatePen(PS_SOLID, 1, RGB(200, 200, 255)); // light blue lines
-        HGDIOBJ hOldPen = SelectObject(hdc, hBluePen);
+            SelectObject(hdc, hOldPen);
+            DeleteObject(hBluePen);
+           
 
-        int lineHeight = 20;
-        for (int y = lineHeight; y < rcClient.bottom; y += lineHeight)
-        {
-            MoveToEx(hdc, 0, y, NULL);
-            LineTo(hdc, rcClient.right, y);
-        }
+           // Vertical red margin line
+            HPEN hRedPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
+            hOldPen = SelectObject(hdc, hRedPen);
+            MoveToEx(hdc, 50, 0, NULL);
+            LineTo(hdc, 50, rc.bottom);
+            SelectObject(hdc, hOldPen);
+            DeleteObject(hRedPen);
 
-        // Restore pen
-        SelectObject(hdc, hOldPen);
-        DeleteObject(hBluePen);
-
-        // Vertical red margin line
-        HPEN hRedPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
-        hOldPen = SelectObject(hdc, hRedPen);
-        MoveToEx(hdc, 50, 0, NULL); // 50px margin
-        LineTo(hdc, 50, rcClient.bottom);
-        SelectObject(hdc, hOldPen);
-        DeleteObject(hRedPen);
-
-        EndPaint(hWnd, &ps);
-    }
+            ReleaseDC(hWnd, hdc);
+     }
+     }*/
     break;
     case WM_DESTROY:
         OutputDebugStringA("Window Destroyed\n");
@@ -583,3 +571,40 @@ INT_PTR CALLBACK MyModeless(HWND hDlg, UINT message, WPARAM wParam, LPARAM lPara
     return (INT_PTR)FALSE;
 }
 
+
+/*
+ PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hWnd, &ps);
+
+        RECT rcClient;
+        GetClientRect(hWnd, &rcClient);
+
+        // Fill background yellow
+        FillRect(hdc, &rcClient, hEditBg);
+
+        // Horizontal ruled lines
+        HPEN hBluePen = CreatePen(PS_SOLID, 1, RGB(200, 200, 255)); // light blue lines
+        HGDIOBJ hOldPen = SelectObject(hdc, hBluePen);
+
+        int lineHeight = 20;
+        for (int y = lineHeight; y < rcClient.bottom; y += lineHeight)
+        {
+            MoveToEx(hdc, 0, y, NULL);
+            LineTo(hdc, rcClient.right, y);
+        }
+
+        // Restore pen
+        SelectObject(hdc, hOldPen);
+        DeleteObject(hBluePen);
+
+        // Vertical red margin line
+        HPEN hRedPen = CreatePen(PS_SOLID, 2, RGB(255, 0, 0));
+        hOldPen = SelectObject(hdc, hRedPen);
+        MoveToEx(hdc, 50, 0, NULL); // 50px margin
+        LineTo(hdc, 50, rcClient.bottom);
+        SelectObject(hdc, hOldPen);
+        DeleteObject(hRedPen);
+
+        EndPaint(hWnd, &ps);
+
+*/
